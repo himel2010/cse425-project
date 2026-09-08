@@ -23,6 +23,7 @@ results/retrieval_examples/*
 !results/retrieval_examples/.gitkeep
 
 .claude-flow/
+*.excalidraw
 
 # OS / editor
 .DS_Store
