@@ -1,0 +1,15 @@
+# torch installed separately via CUDA index (see README / Phase 0)
+torch>=2.2
+torch-geometric>=2.5
+transformers>=4.40
+librosa>=0.10
+soundfile
+audioread
+scikit-learn
+pandas
+numpy
+matplotlib
+tqdm
+pyyaml
+datasets          # MusicCaps audio via CLAPv2/MusicCaps HF mirror (YouTube blocks yt-dlp)
+jupyter

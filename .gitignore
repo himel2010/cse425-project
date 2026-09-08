@@ -22,8 +22,17 @@ results/retrieval_examples/*
 !results/plots/.gitkeep
 !results/retrieval_examples/.gitkeep
 
+# submission sample graphs are deliverables (spec §10) — keep despite *.pt above
+!results/sample_graphs/
+!results/sample_graphs/*.pt
+
 .claude-flow/
 *.excalidraw
+
+# PDF-to-markdown conversion (spec source stays as PDF; script is a scratch tool)
+src/pdf_to_markdown.py
+CSE425_Project_GNN_BERT_Music_Context.md
+*_images/
 
 # OS / editor
 .DS_Store

@@ -1,0 +1,107 @@
+# Single source of truth for all hyperparameters (PLAN.md §5).
+# src/*.py read this file. Do not hardcode values that appear here.
+
+seed: 42
+
+paths:
+  data_raw: data/raw
+  data_processed: data/processed
+  splits: data/splits
+  results: results
+  checkpoints: results/checkpoints
+  plots: results/plots
+
+datasets:
+  mtat:
+    root: data/raw/mtat
+    audio_dir: data/raw/mtat/audio
+    annotations: data/raw/mtat/annotations_final.csv
+    clip_info: data/raw/mtat/clip_info_final.csv
+    clip_seconds: 29
+    # Folder-based split (D6): 16 folders 0-9,a-f
+    train_folders: ["0","1","2","3","4","5","6","7","8","9","a","b","c"]
+    val_folders: ["d"]
+    test_folders: ["e","f"]
+  musiccaps:
+    root: data/raw/musiccaps
+    csv: data/raw/musiccaps/musiccaps-public.csv
+    wav_dir: data/raw/musiccaps/wav
+    clip_seconds: 10
+    sample_rate: 22050
+    split_seed: 42
+    test_frac: 0.10
+
+labels:
+  top_k_tags: 50            # D5
+
+audio:
+  sample_rate: 22050        # D-spec §3.1
+  mono: true
+  # log-mel (CNN baseline B2)
+  n_fft: 1024
+  hop_length: 512
+  n_mels: 128
+  # segmentation for graphs
+  segment_seconds: 5.0
+  segment_hop_seconds: 2.5
+  min_partial_window_seconds: 2.0
+  # node features: MFCC-20 (mean+std) + chroma-12 (mean+std) = 64
+  n_mfcc: 20
+  n_chroma: 12
+  node_feat_dim: 64
+
+graph:
+  sim_threshold: 0.6        # tau
+  max_extra_edges_per_node: 4
+
+text:
+  bert_model: distilbert-base-uncased   # D8
+  max_len_metadata: 64      # MTAT short strings (Task 1)
+  max_len_caption: 128      # MusicCaps (spec §3.4)
+
+model:
+  hidden_dim: 256
+  gnn_layers: 2
+  dropout: 0.3
+  proj_dim: 256             # contrastive / cross-attn projection
+
+# GPU is 4 GB (RTX 3050 Ti Laptop). micro_batch * grad_accum = effective batch.
+# Fallback per PLAN.md §14 (OOM: halve batch, grad accumulation preserves effective).
+train:
+  task1:                    # BERT baseline
+    epochs: 10
+    lr_bert: 2.0e-5
+    micro_batch: 16
+    grad_accum: 2           # effective 32
+    warmup_frac: 0.05
+    scheduler: cosine
+  cnn_baseline:             # B2
+    epochs: 15
+    lr: 1.0e-3
+    micro_batch: 16
+    grad_accum: 2           # effective 32
+  task2:                    # GNN
+    epochs: 20
+    lr: 1.0e-3
+    weight_decay: 1.0e-4
+    batch: 32               # graphs are tiny, fits
+  task3:                    # fusion + ablations
+    epochs: 15              # planned 15 (PLAN.md P5); was cut to 8 on 4 GB GPU, restored for rebuild
+    lr_bert: 2.0e-5
+    lr_other: 1.0e-3
+    micro_batch: 16
+    grad_accum: 1           # effective 16 (4 GB has headroom; fewer steps/epoch)
+    variants: [cross_attn, concat, bert_only, gnn_only]
+  task4:                    # contrastive
+    epochs: 20
+    lr_gnn: 1.0e-4
+    lr_bert: 2.0e-5
+    micro_batch: 16
+    grad_accum: 4           # effective 64
+    temperature: 0.07       # InfoNCE tau (spec §4.4)
+
+eval:
+  threshold: 0.5
+  zero_shot_subset: 500     # MTAT test subset for Task 4 zero-shot probe
+  retrieval_examples: 10
+  human_eval_examples: 10
