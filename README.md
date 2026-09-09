@@ -16,7 +16,8 @@ pip install torch --index-url https://download.pytorch.org/whl/cu121   # CUDA 12
 pip install -r requirements.txt
 ```
 
-Requires an NVIDIA GPU (tested on RTX 3050 Ti, 4 GB), `ffmpeg` on PATH, and (for the
+Requires an NVIDIA GPU (results in this README were produced on an RTX 4070 Ti SUPER,
+16 GB), `ffmpeg` on PATH, and (for the
 report) `pdflatex`. `config.yaml` holds every hyperparameter — scripts read it and
 resolve all paths against the repo root, so run them from anywhere.
 
@@ -67,16 +68,16 @@ Outputs land in `results/`: `metrics.json` (single metrics store), `plots/*.png`
 | Model | Macro-F1 | Micro-F1 | mean AUC-PR |
 |---|---|---|---|
 | B1 random | 0.066 | 0.098 | 0.066 |
-| B3 / Task 1 BERT (metadata) | 0.195 | 0.319 | 0.300 |
-| Task 2 GraphSAGE | 0.235 | 0.360 | 0.346 |
-| B2 CNN (log-mel) | 0.299 | 0.432 | 0.400 |
-| Task 3 bert_only | 0.224 | 0.340 | 0.309 |
-| Task 3 gnn_only | 0.224 | 0.377 | 0.332 |
-| Task 3 concat | **0.276** | 0.403 | 0.389 |
-| Task 3 cross-attn | 0.257 | 0.382 | 0.385 |
+| B3 / Task 1 BERT (metadata) | 0.189 | 0.318 | 0.302 |
+| Task 2 GraphSAGE | 0.232 | 0.353 | 0.350 |
+| B2 CNN (log-mel) | 0.290 | 0.427 | 0.400 |
+| Task 3 bert_only | 0.217 | 0.333 | 0.294 |
+| Task 3 gnn_only | 0.242 | 0.358 | 0.353 |
+| Task 3 concat | **0.278** | 0.400 | 0.378 |
+| Task 3 cross-attn | 0.272 | 0.404 | 0.378 |
 
-**Task 4 (MusicCaps test, 535 clips):** Caption→Audio R@1/5/10 = 3.0/14.9/23.4;
-Audio→Caption = 3.7/13.6/22.1 (random R@10 ≈ 1.9%). Zero-shot tag probe Macro-F1 = 0.172.
+**Task 4 (MusicCaps test, 535 clips):** Caption→Audio R@1/5/10 = 5.2/14.6/21.9;
+Audio→Caption = 4.1/13.3/20.8 (random R@10 ≈ 1.9%). Zero-shot tag probe Macro-F1 = 0.164.
 
 Fusion (concat & cross-attn) beats both unimodal ablations, confirming the modalities are
 complementary. All models beat the random baseline. Numbers are reproducible with seed 42.

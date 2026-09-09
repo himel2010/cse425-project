@@ -11,10 +11,10 @@ free-text captions) is encoded by DistilBERT. We evaluate four tasks on
 MagnaTagATune (MTAT) and MusicCaps: (1) text-only tagging, (2) graph-only
 tagging, (3) graph–text fusion with ablations, and (4) contrastive
 audio–caption retrieval. On MTAT top-50 tagging, both fusion variants beat their
-unimodal ablations (concat Macro-F1 0.276, cross-attention 0.257 vs. 0.224 for
-either single modality), and the contrastive model reaches Caption→Audio R@10 of
-23.4% (~12× random) with a zero-shot tag Macro-F1 of 0.172. All models clearly
-beat a random baseline (0.066). Code and reproducible artifacts (seed 42)
+unimodal ablations (concat Macro-F1 0.278, cross-attention 0.272 vs. 0.217
+bert-only and 0.242 gnn-only), and the contrastive model reaches Caption→Audio
+R@10 of 21.9% (~11× random) with a zero-shot tag Macro-F1 of 0.164. All models
+clearly beat a random baseline (0.066). Code and reproducible artifacts (seed 42)
 accompany the report.
 
 ## 1. Introduction
@@ -72,9 +72,8 @@ mirror (5,352 clips) and use a deterministic 90/10 split (seed 42). All runs use
 seed 42.
 
 **Training.** DistilBERT is fine-tuned at lr 2×10⁻⁵; GNN/fusion heads at 10⁻³.
-We use AdamW, mixed precision, and gradient accumulation to fit a 4 GB GPU.
-Task 1: 10 epochs; Task 2: 20; CNN baseline: 15; Task 3: 8 (validation plateaus
-early); Task 4: 20.
+We use AdamW, mixed precision, and gradient accumulation (effective batch
+16–64). Task 1: 10 epochs; Task 2: 20; CNN baseline: 15; Task 3: 15; Task 4: 20.
 
 **Baselines.** B1 random predicts each tag with its prior (analytic F1). B2 is a
 4-block CNN on log-mel spectrograms. B3 is the Task-1 BERT model.
@@ -87,40 +86,43 @@ ablation; all models beat random.*
 | Model | Macro-F1 | Micro-F1 | mean AUC-PR |
 |---|---|---|---|
 | B1 random | 0.066 | 0.098 | 0.066 |
-| B3 / Task 1 BERT (metadata) | 0.195 | 0.319 | 0.300 |
-| Task 2 GraphSAGE | 0.235 | 0.360 | 0.346 |
-| B2 CNN (log-mel) | 0.299 | 0.432 | 0.400 |
-| Task 3 `bert_only` | 0.224 | 0.340 | 0.309 |
-| Task 3 `gnn_only` | 0.224 | 0.377 | 0.332 |
-| Task 3 `concat` | **0.276** | 0.403 | 0.389 |
-| Task 3 `cross_attn` | 0.257 | 0.382 | 0.385 |
+| B3 / Task 1 BERT (metadata) | 0.189 | 0.318 | 0.302 |
+| Task 2 GraphSAGE | 0.232 | 0.353 | 0.350 |
+| B2 CNN (log-mel) | 0.290 | 0.427 | 0.400 |
+| Task 3 `bert_only` | 0.217 | 0.333 | 0.294 |
+| Task 3 `gnn_only` | 0.242 | 0.358 | 0.353 |
+| Task 3 `concat` | **0.278** | 0.400 | 0.378 |
+| Task 3 `cross_attn` | 0.272 | 0.404 | 0.378 |
 
 *Table 2: Task 4 contrastive retrieval (MusicCaps test, 535 clips) and zero-shot
 tag transfer to MTAT. Random R@10 ≈ 1.9%.*
 
 | Direction | R@1 | R@5 | R@10 |
 |---|---|---|---|
-| Caption → Audio | 2.99 | 14.95 | 23.36 |
-| Audio → Caption | 3.74 | 13.64 | 22.06 |
+| Caption → Audio | 5.23 | 14.58 | 21.87 |
+| Audio → Caption | 4.11 | 13.27 | 20.75 |
 
 | Zero-shot tag probe | value |
 |---|---|
-| Macro-F1 | 0.172 |
-| Micro-F1 | 0.197 |
-| mean AUC-PR | 0.185 |
+| Macro-F1 | 0.164 |
+| Micro-F1 | 0.179 |
+| mean AUC-PR | 0.162 |
 
-**Tagging (Table 1).** Audio structure alone (GraphSAGE, 0.235) already beats
-sparse metadata text (BERT, 0.195); the raw-spectrogram CNN is the strongest
-single model (0.299), unsurprising since 64-dim segment nodes discard fine
+**Tagging (Table 1).** Audio structure alone (GraphSAGE, 0.232) already beats
+sparse metadata text (BERT, 0.189); the raw-spectrogram CNN is the strongest
+single model (0.290), unsurprising since 64-dim segment nodes discard fine
 spectral detail. The key result is the ablation: fusing modalities beats either
-alone — `concat` 0.276 and `cross_attn` 0.257 vs. 0.224 for both `bert_only` and
-`gnn_only`. Simple concatenation edging out cross-attention suggests the CLS
-summary already carries most of the useful text signal for these short metadata
-strings.
+alone — `concat` 0.278 and `cross_attn` 0.272 vs. 0.217 for `bert_only` and
+0.242 for `gnn_only`. The two fusion variants are effectively tied: `concat`
+leads on Macro-F1 by 0.006 while `cross_attn` leads on Micro-F1 (0.404 vs.
+0.400) and matches it on AUC-PR (0.378), so we do not claim an advantage for
+either. That cross-attention buys no clear gain is consistent with the CLS
+summary already carrying most of the useful text signal in these short metadata
+strings, which give the attention little token structure to exploit.
 
-**Retrieval (Table 2).** On captions–audio the dual encoder reaches R@10 ≈ 23%,
+**Retrieval (Table 2).** On captions–audio the dual encoder reaches R@10 ≈ 22%,
 more than an order of magnitude above chance, and transfers zero-shot to MTAT
-tagging (Macro-F1 0.172) using only tag-name prompts, despite never seeing MTAT
+tagging (Macro-F1 0.164) using only tag-name prompts, despite never seeing MTAT
 tags during contrastive training.
 
 ![Validation Macro-F1 vs epoch](../results/plots/f1_curves.png)
@@ -128,26 +130,44 @@ tags during contrastive training.
 *Figure 2: Validation Macro-F1 vs. epoch across tasks/variants.*
 
 **Analysis.** Figure 3 shows a t-SNE of the fused Task-3 embedding on MTAT test,
-coloured by dominant-tag genre umbrella: classical, electronic, world, and
-acoustic clips form clearly separated regions, indicating the fusion learns
-semantically organised structure. Qualitatively, the demo predicts {classical,
-opera, violin, strings} for a Bach cantata clip (exact match), and
-caption→audio retrieval for a "soft female-vocal pop" query returns
-female-vocal/pop clips. Case studies of well-retrieved clips show graphs with
-several similarity edges (repeated segments), consistent with the intuition that
-self-similar structure aids alignment.
+coloured by dominant-tag genre umbrella: classical and vocal clips occupy the
+upper left, ambient the lower left, and electronic and rock the right-hand side,
+so the frequent genres fall in visibly distinct regions, indicating the fusion
+learns semantically organised structure. The three rare umbrellas (world,
+instrumental, pop; at most 38 of the 2,993 test clips each) are too sparse to
+form regions of their own. Figure 4 repeats the projection coloured by mood
+umbrella, where calm (1,007 clips) and energetic (1,554) occupy broadly opposite
+sides of the map while the smaller dark (132) and upbeat (7) classes stay mixed
+into the calm side, showing the embedding organises broad arousal more sharply
+than finer affective distinctions.
+Qualitatively, the demo predicts {opera, classical, violin, strings} for a Bach
+cantata clip — an exact match to its four ground-truth tags — while
+caption→audio retrieval for a "soft female-vocal pop" query returns clips that
+share the soft female-vocal character (a lightly sad female vocal, a lullaby)
+but not the pop genre, illustrating that the contrastive space captures
+timbre/mood more reliably than genre. The three case studies of well-retrieved
+clips are all 3-node graphs (a 10 s MusicCaps clip yields only three 5 s
+windows) carrying 2 similarity edges on top of the 4 temporal ones, i.e. their
+non-adjacent segments are self-similar — consistent with the intuition that
+self-similar structure aids alignment, though at this graph size the evidence is
+suggestive rather than conclusive.
 
 ![t-SNE of fused embedding](../results/plots/tsne_task3.png)
 
 *Figure 3: t-SNE of the Task-3 fused embedding z (MTAT test), coloured by genre
 umbrella.*
 
+![t-SNE mood](../results/plots/tsne_task3_mood.png)
+
+*Figure 4: t-SNE of the Task-3 fused embedding z (MTAT test), coloured by mood
+umbrella.*
+
 **Limitations.** Node features are low-dimensional hand-crafted descriptors,
 capping the graph branch below the CNN; learned per-segment audio embeddings would
 likely close the gap. Task-1 text is only metadata, not lyrics/captions, so the
-language branch is weak on MTAT. Task 3 was trained for 8 epochs under a
-hardware/runtime constraint. Human evaluation of retrieval was a single-rater
-self-assessment.
+language branch is weak on MTAT. Human evaluation of retrieval was not
+conducted; the rating sheet (`results/human_eval_sheet.csv`) is provided for
+future assessment.
 
 ## 5. Conclusion
 

@@ -3,15 +3,15 @@
 | Model | Macro-F1 | Micro-F1 | mean AUC-PR |
 |---|---|---|---|
 | B1 random | 0.066 | 0.0981 | 0.066 |
-| B2 CNN | 0.2991 | 0.4317 | 0.3998 |
-| B3/Task1 BERT | 0.1951 | 0.3194 | 0.3003 |
-| Task2 GNN | 0.2349 | 0.3596 | 0.3464 |
-| Task3 bert_only | 0.2245 | 0.3404 | 0.3087 |
-| Task3 gnn_only | 0.224 | 0.3773 | 0.3317 |
-| Task3 concat | 0.2756 | 0.4027 | 0.3887 |
-| Task3 cross_attn | 0.2569 | 0.3823 | 0.3847 |
+| B2 CNN | 0.2902 | 0.4274 | 0.3996 |
+| B3/Task1 BERT | 0.1886 | 0.3184 | 0.302 |
+| Task2 GNN | 0.2319 | 0.353 | 0.3502 |
+| Task3 bert_only | 0.2168 | 0.3333 | 0.2936 |
+| Task3 gnn_only | 0.2422 | 0.3576 | 0.3525 |
+| Task3 concat | 0.2784 | 0.4003 | 0.3776 |
+| Task3 cross_attn | 0.2721 | 0.4039 | 0.3777 |
 
 ## Task 4 retrieval (MusicCaps test)
-- Caption->Audio: {'R@1': 2.99, 'R@10': 23.36, 'R@5': 14.95}
-- Audio->Caption: {'R@1': 3.74, 'R@10': 22.06, 'R@5': 13.64}
-- Zero-shot tag probe: {'macro_f1': 0.1723, 'mean_auc_pr': 0.1854, 'micro_f1': 0.1968, 'threshold': 0.3216}
+- Caption->Audio: {'R@1': 5.23, 'R@10': 21.87, 'R@5': 14.58}
+- Audio->Caption: {'R@1': 4.11, 'R@10': 20.75, 'R@5': 13.27}
+- Zero-shot tag probe: {'macro_f1': 0.1639, 'mean_auc_pr': 0.1616, 'micro_f1': 0.1789, 'threshold': 0.1508}

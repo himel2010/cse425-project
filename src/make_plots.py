@@ -152,11 +152,14 @@ def _tsne_plot(cfg, data, mapping, title: str, out_name: str):
     idx = np.random.default_rng(cfg["seed"]).choice(len(z), n, replace=False)
     emb = TSNE(n_components=2, init="pca", perplexity=30,
                random_state=cfg["seed"]).fit_transform(z[idx])
+    # one palette for both the points and the legend: indexing the colormap by
+    # category directly (not via a normalised scalar) keeps the two in sync.
+    palette = plt.get_cmap("tab10")
+    pt_colors = [palette(c % 10) for c in np.array(colors)[idx]]
     plt.figure(figsize=(9, 7))
-    plt.scatter(emb[:, 0], emb[:, 1], c=np.array(colors)[idx],
-                cmap="tab10", s=8, alpha=0.7)
-    handles = [plt.Line2D([0], [0], marker="o", ls="", color=plt.cm.tab10(cmap[g] / 10),
-                          label=g) for g in uniq]
+    plt.scatter(emb[:, 0], emb[:, 1], c=pt_colors, s=8, alpha=0.7)
+    handles = [plt.Line2D([0], [0], marker="o", ls="", color=palette(cmap[g] % 10),
+                          label=f"{g} ({labels.count(g)})") for g in uniq]
     plt.legend(handles=handles, fontsize=8)
     plt.title(title)
     out = Path(cfg["paths"]["plots"]) / out_name
