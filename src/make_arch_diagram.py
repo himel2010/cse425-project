@@ -1,6 +1,17 @@
-"""Generate a simple architecture diagram PNG for the report (P8).
-Recreated schematically from gnn_bert_music_pipeline.excalidraw (no excalidraw
-renderer available offline)."""
+"""Generate the pipeline architecture figure for the report (P8).
+
+Two vertical lanes, audio on the left and text on the right, meeting in a
+fusion block that feeds one head to each side. Every connector is either
+vertical inside a lane, a short symmetric diagonal into the fusion block, or a
+horizontal run out to a head, so no arrow crosses a box. The four Task-3
+variants are listed inside the fusion block instead of being drawn as bypass
+arrows, which also matches the code: they are settings of one `FusionModel`,
+not separate paths.
+
+The aspect ratio is deliberately close to 3:2. An earlier wide version scaled
+down to about a third of its size inside a NeurIPS column and the box text
+became unreadable.
+"""
 from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
@@ -9,51 +20,79 @@ from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
 
 from utils import load_config, ensure_dir
 
+AUDIO = "#AEC7E8"
+TEXT = "#FFBB78"
+ENC = "#98DF8A"
+FUSE = "#FF9896"
+HEAD = "#C5B0D5"
 
-def box(ax, x, y, w, h, text, color):
-    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.02",
-                                fc=color, ec="black", lw=1.2))
-    ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=9)
+G_DIM = r"$g \in \mathbb{R}^{256}$"
+T_CLS = r"$t_{\mathrm{CLS}} \in \mathbb{R}^{768}$"
+H_DIM = r"$H \in \mathbb{R}^{L \times 768}$"
+CTX = r"$\mathrm{ctx}=\mathrm{softmax}(qK^{\top}\!/\sqrt{d})\,V$"
+QKV = r"$q=gW_Q$,   $K,V=HW$,   $z=[\,g\,;\,\mathrm{ctx}\,]$"
 
 
-def arrow(ax, x1, y1, x2, y2):
-    ax.add_patch(FancyArrowPatch((x1, y1), (x2, y2), arrowstyle="->",
-                                 mutation_scale=14, lw=1.2, color="#333"))
+def box(ax, x, y, w, h, text, color, fontsize=9.5):
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.03",
+                                fc=color, ec="#222", lw=1.1))
+    ax.text(x + w / 2, y + h / 2, text, ha="center", va="center",
+            fontsize=fontsize, linespacing=1.45)
+
+
+def arrow(ax, x1, y1, x2, y2, lw=1.3):
+    ax.add_patch(FancyArrowPatch((x1, y1), (x2, y2), arrowstyle="-|>",
+                                 mutation_scale=14, lw=lw, color="#333",
+                                 shrinkA=0, shrinkB=0))
 
 
 def main():
     cfg = load_config()
-    fig, ax = plt.subplots(figsize=(11, 5.5))
-    ax.set_xlim(0, 11); ax.set_ylim(0, 5.5); ax.axis("off")
+    W, H = 9.5, 6.6
+    fig, ax = plt.subplots(figsize=(W, H))
+    ax.set_xlim(0, W)
+    ax.set_ylim(0, H)
+    ax.axis("off")
 
-    A = "#AEC7E8"; T = "#FFBB78"; F = "#98DF8A"; H = "#FF9896"
-    # audio branch
-    box(ax, 0.2, 4.2, 1.7, 0.8, "Audio clip\n(22.05 kHz)", A)
-    box(ax, 0.2, 2.9, 1.7, 0.8, "5s/2.5s segments\nMFCC+chroma (64d)", A)
-    box(ax, 0.2, 1.6, 1.7, 0.8, "Segment graph\ntemporal+similarity", A)
-    box(ax, 2.4, 1.6, 1.9, 0.8, "GraphSAGE\n2 layers, mean pool", F)
-    for y in (4.2, 2.9):
-        arrow(ax, 1.05, y, 1.05, y - 0.5)
-    arrow(ax, 1.9, 2.0, 2.4, 2.0)
+    bw, bh = 3.6, 1.15
+    lx, rx = 0.3, 5.6
+    rows = [5.30, 3.70, 2.10]
 
-    # text branch
-    box(ax, 0.2, 0.2, 1.7, 0.8, "Text\n(metadata / caption)", T)
-    box(ax, 2.4, 0.2, 1.9, 0.8, "DistilBERT\n(fine-tuned)", T)
-    arrow(ax, 1.9, 0.6, 2.4, 0.6)
+    audio = [
+        "Audio clip\nmono, 22.05 kHz\n29 s (MTAT), 10 s (MusicCaps)",
+        "Segment windows\n5 s window, 2.5 s hop\nMFCC-20 + chroma-12 (64-d)",
+        "Segment graph + GraphSAGE\ntemporal and similarity edges\n"
+        "2 layers, mean readout, " + G_DIM,
+    ]
+    text = [
+        "Text input\nMTAT: artist - title (album)\nMusicCaps: free-text caption",
+        "DistilBERT\n6 layers, fully fine-tuned\nmax 64 (metadata), 128 (caption)",
+        "Text states\n" + T_CLS + ",   " + H_DIM,
+    ]
+    for i, y in enumerate(rows):
+        box(ax, lx, y, bw, bh, audio[i], ENC if i == 2 else AUDIO)
+        box(ax, rx, y, bw, bh, text[i], ENC if i == 2 else TEXT)
+        if i < 2:
+            arrow(ax, lx + bw / 2, y, lx + bw / 2, rows[i + 1] + bh)
+            arrow(ax, rx + bw / 2, y, rx + bw / 2, rows[i + 1] + bh)
 
-    # fusion
-    box(ax, 4.9, 0.9, 2.2, 1.6, "Fusion\ncross-attention\n(graph q, text k/v)\nz = [g ; ctx]", H)
-    arrow(ax, 4.3, 2.0, 4.9, 1.9)
-    arrow(ax, 4.3, 0.6, 4.9, 1.1)
+    fx, fy, fw, fh = 2.60, 0.45, 4.30, 1.45
+    box(ax, fx, fy, fw, fh,
+        "Fusion block (Task 3)\n" + CTX + "\n" + QKV +
+        "\nvariants: cross-attention, early concat,\ngraph-only, text-only",
+        FUSE, fontsize=9)
+    arrow(ax, lx + bw / 2, rows[2], fx + 0.55, fy + fh)
+    arrow(ax, rx + bw / 2, rows[2], fx + fw - 0.55, fy + fh)
 
-    # heads
-    box(ax, 7.6, 2.6, 2.2, 0.9, "Task 1-3 head\n50-tag sigmoid (BCE)", "#C5B0D5")
-    box(ax, 7.6, 0.6, 2.2, 0.9, "Task 4\nInfoNCE retrieval\n(dual encoder)", "#C5B0D5")
-    arrow(ax, 7.1, 1.9, 7.6, 3.0)
-    arrow(ax, 4.3, 2.0, 7.6, 3.1)   # gnn -> tag head (task2)
-    arrow(ax, 7.1, 1.5, 7.6, 1.1)
+    hw = 2.00
+    box(ax, 0.30, fy, hw, fh,
+        "Tagging head\n50 sigmoids, BCE\nTasks 1-3", HEAD, fontsize=9)
+    box(ax, 7.20, fy, hw, fh,
+        "Projection head\n256-d, L2-normalised\nInfoNCE, Task 4", HEAD, fontsize=9)
+    arrow(ax, fx, fy + fh / 2, 0.30 + hw, fy + fh / 2)
+    arrow(ax, fx + fw, fy + fh / 2, 7.20, fy + fh / 2)
 
-    ax.set_title("GNN-BERT music context pipeline", fontsize=12)
+    ax.set_title("GNN-BERT music context pipeline", fontsize=13, pad=4)
     out = ensure_dir(Path(cfg["paths"]["results"]) / "plots") / "architecture.png"
     plt.savefig(out, dpi=200, bbox_inches="tight")
     print(f"wrote {out}")

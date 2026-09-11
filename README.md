@@ -56,7 +56,7 @@ relaunch (the environment kills long runs), deleting the resume file on clean co
 
 ```bash
 python src/evaluate.py --what all   # B1 baseline, example preds, retrieval, case studies, table
-python src/make_plots.py            # F1 curves, PR curves, t-SNE of fused z
+python src/make_plots.py            # F1 curves, PR curves, per-tag profile, t-SNE
 ```
 
 Outputs land in `results/`: `metrics.json` (single metrics store), `plots/*.png`,

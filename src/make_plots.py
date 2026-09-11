@@ -52,35 +52,44 @@ MOOD_MAP = {
 
 
 def f1_curves(cfg):
+    """Macro and micro F1 in two panels.
+
+    One explicit colour per model, shared across both panels. The old
+    single-axes version relied on the default colour cycle, which wraps after
+    ten entries: with six models times two metrics it handed two different
+    curves the same colour and the legend became unreadable.
+    """
     m = load_metrics()
-    plt.figure(figsize=(8, 5))
-    plotted = False
-    for key, label in [("task1", "Task1 BERT"), ("task2", "Task2 GNN")]:
+    series = []
+    for key, label in [("task1", "Task 1 BERT"), ("task2", "Task 2 GraphSAGE"),
+                       ("baseline_cnn", "B2 CNN (log-mel)")]:
         h = m.get(key, {}).get("history")
         if h:
-            ep = [r["epoch"] for r in h]
-            plt.plot(ep, [r["macro_f1"] for r in h], marker="o",
-                     label=f"{label} macro-F1")
-            plt.plot(ep, [r["micro_f1"] for r in h], linestyle="--",
-                     alpha=0.6, label=f"{label} micro-F1")
-            plotted = True
-    for var, h in m.get("task3", {}).get("variants", {}).items():
-        hist = h.get("history")
-        if hist:
-            ep = [r["epoch"] for r in hist]
-            plt.plot(ep, [r["macro_f1"] for r in hist], marker=".",
-                     label=f"Task3 {var} macro-F1")
-            plt.plot(ep, [r["micro_f1"] for r in hist], linestyle="--",
-                     alpha=0.6, label=f"Task3 {var} micro-F1")
-            plotted = True
-    if not plotted:
+            series.append((label, h))
+    pretty = {"cross_attn": "cross-attention", "concat": "early concat",
+              "gnn_only": "graph-only", "bert_only": "text-only"}
+    for var, h in sorted(m.get("task3", {}).get("variants", {}).items()):
+        if h.get("history"):
+            series.append((f"Task 3 {pretty.get(var, var)}", h["history"]))
+    if not series:
         print("no history yet; skip f1_curves")
         return
-    plt.xlabel("epoch"); plt.ylabel("val F1"); plt.legend(fontsize=7)
-    plt.title("Macro/Micro-F1 vs epoch"); plt.grid(alpha=0.3)
+
+    palette = plt.get_cmap("tab10")
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.2), sharex=True, sharey=True)
+    for metric, ax, title in [("macro_f1", axes[0], "Validation Macro-F1"),
+                              ("micro_f1", axes[1], "Validation Micro-F1")]:
+        for i, (label, h) in enumerate(series):
+            ax.plot([r["epoch"] for r in h], [r[metric] for r in h],
+                    marker="o", ms=3, lw=1.4, color=palette(i % 10), label=label)
+        ax.set_title(title, fontsize=10)
+        ax.set_xlabel("epoch"); ax.grid(alpha=0.3)
+    axes[0].set_ylabel("F1 (validation split)")
+    axes[1].legend(fontsize=8, loc="lower right")
+    fig.tight_layout()
     out = Path(cfg["paths"]["plots"]) / "f1_curves.png"
-    ensure_dir(out.parent); plt.savefig(out, dpi=DPI, bbox_inches="tight")
-    plt.close(); print(f"wrote {out}")
+    ensure_dir(out.parent); fig.savefig(out, dpi=DPI, bbox_inches="tight")
+    plt.close(fig); print(f"wrote {out}")
 
 
 def _load_task3_test_probs(cfg):
@@ -131,11 +140,63 @@ def auc_pr_task3(cfg, data):
         pr, rc, _ = precision_recall_curve(y[:, j], p[:, j])
         plt.plot(rc, pr, label=tags[j])
     plt.xlabel("recall"); plt.ylabel("precision")
-    plt.title("Task3 cross-attn: PR curves (top-10 tags)")
+    plt.title("Task 3 cross-attention: precision-recall curves, ten most frequent tags")
     plt.legend(fontsize=7); plt.grid(alpha=0.3)
     out = Path(cfg["paths"]["plots"]) / "auc_pr_task3.png"
     ensure_dir(out.parent); plt.savefig(out, dpi=DPI, bbox_inches="tight")
     plt.close(); print(f"wrote {out}")
+
+
+def tag_profile(cfg, data):
+    """Per-tag F1 and average precision against test-set tag prevalence.
+
+    This is what makes the Macro/Micro-F1 gap legible: Micro-F1 is dominated by
+    the handful of tags that appear on thousands of clips, while Macro-F1 gives
+    a tag on 30 clips the same weight as a tag on 900, so the rare end of this
+    plot is what holds the headline number down.
+    """
+    from sklearn.metrics import average_precision_score, f1_score
+    y, p, _, tags = data
+    thr = cfg["eval"]["threshold"]
+    prev = y.sum(axis=0)
+    keep = prev > 0
+    f1 = np.array([f1_score(y[:, j], p[:, j] >= thr, zero_division=0)
+                   for j in range(y.shape[1])])
+    ap = np.array([average_precision_score(y[:, j], p[:, j]) if prev[j] > 0 else np.nan
+                   for j in range(y.shape[1])])
+    print(f"[check] cross_attn test macro-F1 {f1[keep].mean():.4f} "
+          f"micro-F1 {f1_score(y, p >= thr, average='micro', zero_division=0):.4f} "
+          f"mean AP {np.nanmean(ap):.4f}")
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.scatter(prev[keep], f1[keep], s=26, color="#1f77b4", label="F1 at threshold 0.5")
+    ax.scatter(prev[keep], ap[keep], s=26, color="#d62728", marker="^",
+               alpha=0.75, label="average precision")
+    for j in np.argsort(-prev)[:6]:
+        ax.annotate(tags[j], (prev[j], f1[j]), fontsize=7.5,
+                    xytext=(3, 4), textcoords="offset points")
+    for j in np.argsort(prev[keep])[:4]:
+        idx = np.flatnonzero(keep)[j]
+        ax.annotate(tags[idx], (prev[idx], f1[idx]), fontsize=7.5,
+                    xytext=(3, 4), textcoords="offset points")
+    ax.axhline(f1[keep].mean(), ls="--", lw=1, color="#444")
+    ax.text(prev[keep].max(), f1[keep].mean() + 0.012,
+            "unweighted mean over tags", ha="right", fontsize=8, color="#444")
+    ax.set_xscale("log")
+    ax.set_xticks([20, 50, 100, 200, 500, 1000])
+    ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    ax.minorticks_off()
+    dead = int(((f1 == 0) & keep).sum())
+    print(f"[check] tags never predicted above threshold: {dead}/{int(keep.sum())}; "
+          f"their share of test positives "
+          f"{prev[(f1 == 0) & keep].sum() / prev[keep].sum():.3f}")
+    ax.set_xlabel("tag prevalence in MTAT test split (clips, log scale)")
+    ax.set_ylabel("per-tag score")
+    ax.set_title("Task 3 cross-attention: per-tag score vs. tag prevalence")
+    ax.grid(alpha=0.3); ax.legend(fontsize=8, loc="upper left")
+    out = Path(cfg["paths"]["plots"]) / "tag_profile.png"
+    ensure_dir(out.parent); fig.savefig(out, dpi=DPI, bbox_inches="tight")
+    plt.close(fig); print(f"wrote {out}")
 
 
 def _tsne_plot(cfg, data, mapping, title: str, out_name: str):
@@ -161,7 +222,11 @@ def _tsne_plot(cfg, data, mapping, title: str, out_name: str):
     handles = [plt.Line2D([0], [0], marker="o", ls="", color=palette(cmap[g] % 10),
                           label=f"{g} ({labels.count(g)})") for g in uniq]
     plt.legend(handles=handles, fontsize=8)
-    plt.title(title)
+    # legend counts are over the whole test split, but t-SNE runs on a
+    # subsample for tractability; say so on the figure so the two cannot be
+    # confused for each other.
+    plt.title(f"{title}\n{n} of {len(z)} test clips plotted; "
+              "legend counts cover the full test split", fontsize=10)
     out = Path(cfg["paths"]["plots"]) / out_name
     ensure_dir(out.parent); plt.savefig(out, dpi=DPI, bbox_inches="tight")
     plt.close(); print(f"wrote {out}")
@@ -169,12 +234,12 @@ def _tsne_plot(cfg, data, mapping, title: str, out_name: str):
 
 def tsne_task3(cfg, data):
     _tsne_plot(cfg, data, GENRE_MAP,
-               "t-SNE of Task-3 fused embedding z (MTAT test)", "tsne_task3.png")
+               "t-SNE of the Task-3 fused embedding (MTAT test), genre umbrella", "tsne_task3.png")
 
 
 def tsne_task3_mood(cfg, data):
     _tsne_plot(cfg, data, MOOD_MAP,
-               "t-SNE of Task-3 fused embedding z (mood umbrella)",
+               "t-SNE of the Task-3 fused embedding (MTAT test), mood umbrella",
                "tsne_task3_mood.png")
 
 
@@ -184,6 +249,7 @@ def main():
     data = _load_task3_test_probs(cfg)
     if data is not None:
         auc_pr_task3(cfg, data)
+        tag_profile(cfg, data)
         tsne_task3(cfg, data)
         tsne_task3_mood(cfg, data)
     else:
