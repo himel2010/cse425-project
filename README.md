@@ -4,9 +4,6 @@ Multi-task music understanding combining a **GraphSAGE** audio-segment graph enc
 with a **DistilBERT** text encoder. Four tasks: (1) text→tag baseline, (2) graph→tag,
 (3) graph+text fusion with ablations, (4) contrastive audio↔caption retrieval.
 
-See `PLAN.md` for the full design and locked decisions, and
-`CSE425_Project_GNN_BERT_Music_Context.md` for the course spec.
-
 ## Setup
 
 ```bash
@@ -17,8 +14,7 @@ pip install -r requirements.txt
 ```
 
 Requires an NVIDIA GPU (results in this README were produced on an RTX 4070 Ti SUPER,
-16 GB), `ffmpeg` on PATH, and (for the
-report) `pdflatex`. `config.yaml` holds every hyperparameter — scripts read it and
+16 GB), `ffmpeg` on PATH. `config.yaml` holds every hyperparameter — scripts read it and
 resolve all paths against the repo root, so run them from anywhere.
 
 ## Data
